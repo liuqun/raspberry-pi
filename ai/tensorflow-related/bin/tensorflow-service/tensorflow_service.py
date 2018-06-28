@@ -87,13 +87,13 @@ class MyRequestHandler(BaseHTTPRequestHandler):
     prediction_result = run_inference_on_image(image_path)
     message_return_to_client = ''
     for one_line in prediction_result:
-      message_return_to_client = message_return_to_client + one_line + '\n'
+      message_return_to_client = message_return_to_client + one_line + '\r\n'
 
     # send response status code
     self.send_response(200)
     
     # send headers
-    self.send_header('Content-type','text/html')
+    self.send_header('Content-type','text/plain; charset=utf-8')
     self.end_headers()
     
     # send message back to client, write content as utf-8 data
