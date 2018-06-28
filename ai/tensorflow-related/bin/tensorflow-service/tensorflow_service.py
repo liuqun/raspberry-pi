@@ -244,23 +244,95 @@ def run_inference_on_image(image):
   return prediction_result
 
 
+class DownloadError(RuntimeError):
+  pass
+
+
+def download_model(url: str, dst_dir: str = None) -> str:
+  """Download model tarball from URL into destination directory
+
+  :param url:
+  :param dst_dir:
+  :returns downloaded filename
+  """
+  import click
+
+  if not is_valid_url(url):
+    raise DownloadError('URL {0} is not valid'.format(url))
+  filename = url.split('/')[-1]
+  if not dst_dir:
+    dst_dir = os.path.abspath('.')
+  if not os.path.isdir(dst_dir):
+    raise DownloadError('{0} is not a valid directory!'.format(dst_dir))
+  path_to_filename = os.path.join(dst_dir, filename)
+  click.echo('Downloading {0} from {1} ...'.format(filename, url))
+  bar_len = 1000
+  with click.progressbar(length=bar_len) as bar:
+    def _progress(count, block_size, total_size):
+      percent = int(count * block_size * bar_len / total_size)
+      if 0 < percent < bar_len:  # Hack because we can't set the position
+        bar.pos = percent
+        bar.update(0)
+
+    try:
+      urllib.request.urlretrieve(url, os.path.join(dst_dir, filename), _progress)
+      bar.update(bar_len)
+    except (urllib.error.URLError, ConnectionAbortedError) as e:
+      raise DownloadError('Download failed: {0}'.format(e))
+  if not os.path.exists(path_to_filename):
+    raise DownloadError('Download failed: {0} do not exist.'.format(path_to_filename))
+  return path_to_filename
+
+
+def is_valid_url(url: str):
+  return True  # TODO: Implement URL format checking...
+
+
+def is_extracted_model_dir(directory: str) -> bool:
+  """Check whether model files are valid or not"""
+  excepted_files = {
+    'classify_image_graph_def.pb',
+    'imagenet_2012_challenge_label_map_proto.pbtxt',
+    'imagenet_synset_to_human_label_map.txt'
+  }
+  for filename in excepted_files:
+    filepath = os.path.join(directory, filename)
+    if not os.path.exists(filepath):
+      return False
+  # TODO: In the future, we may check the data format of each file.
+  return True
+
+
 def maybe_download_and_extract():
   """Download and extract model tar file."""
   dest_directory = FLAGS.model_dir
+  if is_extracted_model_dir(dest_directory):
+    return
   if not os.path.exists(dest_directory):
     os.makedirs(dest_directory)
+  elif not os.path.isdir(dest_directory):
+    raise RuntimeError('%s exists but it is NOT a directory!' % dest_directory)
   filename = DATA_URL.split('/')[-1]
   filepath = os.path.join(dest_directory, filename)
-  if not os.path.exists(filepath):
-    def _progress(count, block_size, total_size):
-      sys.stdout.write('\r>> Downloading %s %.1f%%' % (
-          filename, float(count * block_size) / float(total_size) * 100.0))
-      sys.stdout.flush()
-    filepath, _ = urllib.request.urlretrieve(DATA_URL, filepath, _progress)
-    print()
-    statinfo = os.stat(filepath)
-    print('Succesfully downloaded', filename, statinfo.st_size, 'bytes.')
-  tarfile.open(filepath, 'r:gz').extractall(dest_directory)
+  downloaded = download_model(DATA_URL, dest_directory) if not os.path.exists(filepath) else filepath
+  tarfile_extracted = False
+  MAX_RETRY = 2
+  cnt = 0
+  while not tarfile_extracted and cnt < MAX_RETRY:
+    try:
+      with tarfile.open(downloaded, 'r:gz') as t:
+        t.extractall(dest_directory)
+        tarfile_extracted = True
+        break
+    except EOFError as e:
+      print('Error: File "%s" is broken: %s' % (downloaded, e))
+    except tarfile.TarError as e:
+      print('Error: Can not unzip download file %s: %s' % (downloaded, e))
+    cnt += 1
+    print('Retrying...')
+    downloaded = download_model(DATA_URL, dest_directory)
+  if not tarfile_extracted:
+    raise RuntimeError('Failed to retrieve model files from %s!' % DATA_URL)
 
 
 def main(_):
