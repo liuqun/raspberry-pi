@@ -69,6 +69,11 @@ tf.app.flags.DEFINE_string('warm_up_image_file', '',
                            """Absolute path to warm-up image file.""")
 tf.app.flags.DEFINE_integer('num_top_predictions', 5,
                             """Display this many predictions.""")
+tf.app.flags.DEFINE_string('httpd_bind_ip', '0.0.0.0',
+                           """Specify alternate httpd bind address. """
+                           """By default, httpd will bind to all interfaces of network cards on this machine.""")
+tf.app.flags.DEFINE_integer('httpd_bind_port', 8080,
+                            """Specify alternate httpd bind port.""")
 
 # pylint: disable=line-too-long
 DATA_URL = 'http://download.tensorflow.org/models/image/imagenet/inception-2015-12-05.tgz'
@@ -340,7 +345,7 @@ def main(_):
 
   warm_up_model(FLAGS.warm_up_image_file)
 
-  server_address = ('127.0.0.1', 8080)
+  server_address = (FLAGS.httpd_bind_ip, FLAGS.httpd_bind_port)
   httpd = HTTPServer(server_address, MyRequestHandler)
   print('TensorFlow service started')
   httpd.serve_forever()
