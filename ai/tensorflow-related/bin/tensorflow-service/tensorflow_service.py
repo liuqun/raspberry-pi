@@ -343,6 +343,10 @@ def maybe_download_and_extract():
 def main(_):
   maybe_download_and_extract()
 
+  if not FLAGS.warm_up_image_file or not os.path.exists(FLAGS.warm_up_image_file):
+    # Fail-save to use default image file when --warm_up_image_file do not exists
+    FLAGS.warm_up_image_file = os.path.join(os.path.abspath(FLAGS.model_dir), 'cropped_panda.jpg')
+    print('Using default image file', FLAGS.warm_up_image_file, 'to warm up model...')
   warm_up_model(FLAGS.warm_up_image_file)
 
   server_address = (FLAGS.httpd_bind_ip, FLAGS.httpd_bind_port)
