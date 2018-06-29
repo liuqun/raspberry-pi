@@ -280,7 +280,7 @@ def download_model(url: str, dst_dir: str = None) -> str:
         bar.update(0)
 
     try:
-      urllib.request.urlretrieve(url, os.path.join(dst_dir, filename), _progress)
+      urllib.request.urlretrieve(url, path_to_filename, _progress)
       bar.update(bar_len)
     except (urllib.error.URLError, ConnectionAbortedError) as e:
       raise DownloadError('Download failed: {0}'.format(e))
